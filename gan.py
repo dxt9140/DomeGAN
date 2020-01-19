@@ -48,24 +48,29 @@ class GAN:
             super(nn.Module).__init__()
             super().__init__()
 
-            activation = nn.Sigmoid
+            activation = nn.ReLU
+
+            act = nn.LeakyReLU(0.2, inplace=True)
 
             self.main = nn.Sequential(
                 # nz x 1 x 1
-                nn.ConvTranspose2d(1, 96, kernel_size=3, stride=1, padding=0, bias=False),
+                nn.ConvTranspose2d(nz, 156, kernel_size=4, stride=2, padding=0, bias=False),
                 # nn.BatchNorm2d(features * 32),
                 activation(),
-                # (features * 5) x 3 x 3
-                nn.Conv2d(96, 64, kernel_size=5, stride=2, padding=0, bias=False),
+                # act,
+                # (32) x 5 x 5
+                nn.ConvTranspose2d(156, 96, kernel_size=4, stride=2, padding=0, bias=False),
                 # nn.BatchNorm2d(features * 12),
                 activation(),
+                # act,
                 # (features * 10) x 5 x 5
-                nn.ConvTranspose2d(64, 32, kernel_size=3, stride=1, padding=2, bias=False),
+                nn.ConvTranspose2d(96, 64, kernel_size=4, stride=2, padding=0, bias=False),
                 # nn.BatchNorm2d(features * 4),
                 activation(),
+                # act,
                 # (features * 20) x 7 x 7)
-                nn.Conv2d(32, channels, kernel_size=5, stride=1, padding=1, bias=False),
-                nn.Sigmoid(),
+                nn.ConvTranspose2d(64, channels, kernel_size=4, stride=1, padding=0, bias=False),
+                nn.Tanh(),
                 # (features * 32) x 32 x 32
                 # nn.ConvTranspose2d(features * 32, channels, kernel_size=4, stride=2, padding=1, bias=False),
                 # nn.Sigmoid()
@@ -81,23 +86,27 @@ class GAN:
             super(nn.Module, self).__init__()
             super().__init__()
 
-            activation = nn.Sigmoid
+            activation = nn.ReLU
+            act = nn.LeakyReLU(0.2, inplace=True)
 
             self.main = nn.Sequential(
                 # 3 x 32 x 32
                 nn.Conv2d(channels, 24, kernel_size=3, padding=0, stride=2),
                 # nn.BatchNorm2d(features * 4),
-                activation(),
+                # activation(),
+                act,
                 # (dimensions * 3) x 16 x 16
                 nn.Conv2d(24, 48, kernel_size=3, padding=0, stride=2),
                 # nn.BatchNorm2d(features * 12),
-                activation(),
+                # activation(),
+                act,
                 # (dimensions * 6) x 8 x 8)
                 nn.Conv2d(48, 64, kernel_size=3, padding=0, stride=2),
                 # nn.BatchNorm2d(features * 32),
-                activation(),
+                # activation(),
+                act,
                 # (dimensions * 16) x 2 x 2
-                nn.Conv2d(64, 1, kernel_size=3, padding=0, stride=2),
+                nn.Conv2d(64, 1, kernel_size=3, padding=0, stride=1),
                 nn.Sigmoid()
                 # 1 x 1 x 1
             )

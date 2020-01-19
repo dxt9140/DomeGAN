@@ -104,7 +104,7 @@ if __name__ == '__main__':
                 model.D.zero_grad()
 
                 images, classes = data
-                # print(images.shape)
+                # print("Shape of data: ", images.shape)
 
                 # Train the Discriminator
 
@@ -112,9 +112,7 @@ if __name__ == '__main__':
                 # print(labels.shape)
 
                 # Feed real data into the discriminator and compute gradients
-                # d_forward_real = model.D.forward(images).view(-1)
                 d_forward_real = model.D(images).view(-1)
-                # d_forward_real = model.D(images.to(device))
                 # print("D_forward_real shape: ", str(d_forward_real.shape))
                 d_error_real = loss_func(d_forward_real, labels)
                 d_error_real.backward()
@@ -123,7 +121,7 @@ if __name__ == '__main__':
                 labels.fill_(fake)
 
                 # Generate some random noise
-                noise_batch = torch.rand(argl.batch_size, 1, argl.noise, argl.noise)
+                noise_batch = torch.randn(argl.batch_size, argl.noise, 1, 1)
                 # Shape is batch_size x nz  x 1 x 1
                 # print("Noise shape: " + str(noise_batch.shape))
 
@@ -137,14 +135,15 @@ if __name__ == '__main__':
                 # blargh = blargh.astype(np.uint8)
                 # blargh = cv2.resize(blargh, (300, 300))
                 # cv2.imshow("bana", blargh)
-                # cv2.waitKey()
+                # if cv2.waitKey(0) == ord('q'):
+                #     break
 
                 # d_forward_fake = model.D.forward(Gz).view(-1)
                 d_forward_fake = model.D(Gz.detach()).view(-1)
                 # print("D_forward_fake shape: ", str(d_forward_fake.shape))
                 d_error_fake = loss_func(d_forward_fake, labels)
                 d_error_fake.backward()
-                print("D(G(z)):\t", torch.mean(d_forward_fake).item())
+                print("D(G(z)):\t", d_forward_fake.mean().item())
                 # print(noise_batch)
 
                 total_real = d_error_real + d_error_fake
@@ -171,8 +170,8 @@ if __name__ == '__main__':
 
                 G_optimizer.step()
 
-                print("[%d] %d/%d: D_loss_real [%.4f] D_loss_fake [%.4f] G_loss [%.4f]"
-                      % (e+1, i+1, len(train_loader), d_error_real, d_error_fake, g_error_real))
+                print("[%d/%d] %d/%d: D_loss_real [%.4f] D_loss_fake [%.4f] G_loss [%.4f]"
+                      % (e+1, argl.epochs, i+1, len(train_loader), d_error_real, d_error_fake, g_error_real))
 
         torch.save({
             "Discriminator": model.D.state_dict(),
