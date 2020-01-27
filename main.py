@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim.sgd as sgd
+import torch.optim.adam as adam
 import PIL.Image
 import torchvision
 import torchvision.transforms as transforms
@@ -58,8 +59,8 @@ if __name__ == '__main__':
 
     # This is used below. We cannot pre-form valid and fake tensors like in tensorflow. We must fill a label
     # tensor later with the appropriate values in between each step.
-    real = 1
-    fake = 0
+    real = 1.0
+    fake = 0.0
 
     loss_func = nn.BCELoss()
 
@@ -93,9 +94,12 @@ if __name__ == '__main__':
         model.G.load_state_dict(G_dict)
 
     else:
-        D_optimizer = sgd.SGD(model.D.parameters(), lr=1e-2)
-        G_optimizer = sgd.SGD(model.G.parameters(), lr=1e-2)
+        # D_optimizer = sgd.SGD(model.D.parameters(), lr=2e-4, momentum=0.9)
+        # G_optimizer = sgd.SGD(model.G.parameters(), lr=2e-4, momentum=0.9)
 
+        D_optimizer = adam.Adam(model.D.parameters(), lr=2e-4)
+        G_optimizer = adam.Adam(model.G.parameters(), lr=2e-4)
+        torch.autograd.set_detect_anomaly(True)
         for e in range(argl.epochs):
 
             for i, data in enumerate(train_loader):
@@ -116,27 +120,43 @@ if __name__ == '__main__':
                 # print("D_forward_real shape: ", str(d_forward_real.shape))
                 d_error_real = loss_func(d_forward_real, labels)
                 d_error_real.backward()
-                print("D_x:\t\t", torch.mean(d_forward_real).item())
+                print("D_x:\t\t", d_forward_real.mean().item())
 
                 labels.fill_(fake)
 
                 # Generate some random noise
                 noise_batch = torch.randn(argl.batch_size, argl.noise, 1, 1)
-                # Shape is batch_size x nz  x 1 x 1
+                # noise_batch = torch.rand(argl.batch_size, argl.noise, requires_grad=False)
+                # Shape is batch_size x nz x 1 x 1
                 # print("Noise shape: " + str(noise_batch.shape))
 
                 # Feed fake data into Generator to output an image
                 # Gz = model.G.forward(noise_batch)
                 Gz = model.G(noise_batch)
-                print("Generated shape: ", str(Gz.shape))
+                # print("Generated shape: ", str(Gz.shape))
 
-                # blargh = Gz.detach().numpy()[0].transpose(1, 2, 0)
-                # blargh *= 255
-                # blargh = blargh.astype(np.uint8)
-                # blargh = cv2.resize(blargh, (300, 300))
-                # cv2.imshow("bana", blargh)
-                # if cv2.waitKey(0) == ord('q'):
-                #     break
+                do_show = True
+                if do_show:
+                    fake_image = Gz.detach().numpy()[0].transpose(1, 2, 0)
+                    fake_image *= 255
+                    fake_image = fake_image.astype(np.uint8)
+                    # fake_image = cv2.resize(fake_image, (300, 300))
+
+                    real_image = images.numpy()[0].transpose(1, 2, 0)
+                    real_image *= 255
+                    real_image = real_image.astype(np.uint8)
+                    real_image = cv2.cvtColor(real_image, cv2.COLOR_RGB2BGR)
+                    # real_image = cv2.resize(real_image, (300, 300))
+
+                    combined = np.hstack((fake_image, real_image))
+
+                    cv2.namedWindow("Bwana", cv2.WINDOW_NORMAL)
+                    cv2.resizeWindow("Bwana", 600, 300)
+
+                    cv2.imshow("Bwana", combined)
+                    cv2.waitKey(50)
+                    # if cv2.waitKey(0) == ord('q'):
+                    #     break
 
                 # d_forward_fake = model.D.forward(Gz).view(-1)
                 d_forward_fake = model.D(Gz.detach()).view(-1)
@@ -146,7 +166,8 @@ if __name__ == '__main__':
                 print("D(G(z)):\t", d_forward_fake.mean().item())
                 # print(noise_batch)
 
-                total_real = d_error_real + d_error_fake
+                # total_real = (d_error_real + d_error_fake) / 2
+                # total_real.backward()
 
                 D_optimizer.step()
                 model.G.zero_grad()
@@ -154,9 +175,7 @@ if __name__ == '__main__':
                 # Train the Generator
                 labels.fill_(real)
 
-                # g_forward_fake = model.D.forward(Gz.detach()).view(-1)
                 g_forward_fake = model.D(Gz).view(-1)
-                # g_forward_fake = model.D(Gz.to(device))
                 g_error_real = loss_func(g_forward_fake, labels)
                 g_error_real.backward()
 
