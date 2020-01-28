@@ -57,11 +57,6 @@ if __name__ == '__main__':
 
     train_loader = dataloader.DataLoader(training_data, shuffle=True, batch_size=argl.batch_size)
 
-    # This is used below. We cannot pre-form valid and fake tensors like in tensorflow. We must fill a label
-    # tensor later with the appropriate values in between each step.
-    real = 1.0
-    fake = 0.0
-
     loss_func = nn.BCELoss()
 
     # Load the model. This exists to provide extensibility in case I want to add further models.
@@ -94,12 +89,16 @@ if __name__ == '__main__':
         model.G.load_state_dict(G_dict)
 
     else:
-        # D_optimizer = sgd.SGD(model.D.parameters(), lr=2e-4, momentum=0.9)
-        # G_optimizer = sgd.SGD(model.G.parameters(), lr=2e-4, momentum=0.9)
+        D_optimizer = sgd.SGD(model.D.parameters(), lr=1e-3, momentum=0.9)
+        G_optimizer = sgd.SGD(model.G.parameters(), lr=1e-3, momentum=0.9)
 
-        D_optimizer = adam.Adam(model.D.parameters(), lr=2e-4)
-        G_optimizer = adam.Adam(model.G.parameters(), lr=2e-4)
+        # D_optimizer = adam.Adam(model.D.parameters(), lr=1e-3)
+        # G_optimizer = adam.Adam(model.G.parameters(), lr=1e-3)
         torch.autograd.set_detect_anomaly(True)
+
+        real = torch.full((argl.batch_size, ), 1)
+        fake = torch.full((argl.batch_size, ), 0)
+
         for e in range(argl.epochs):
 
             for i, data in enumerate(train_loader):
@@ -112,20 +111,15 @@ if __name__ == '__main__':
 
                 # Train the Discriminator
 
-                labels = torch.full((argl.batch_size,), real)
-                # print(labels.shape)
-
                 # Feed real data into the discriminator and compute gradients
                 d_forward_real = model.D(images).view(-1)
                 # print("D_forward_real shape: ", str(d_forward_real.shape))
-                d_error_real = loss_func(d_forward_real, labels)
-                d_error_real.backward()
+                d_error_real = loss_func(d_forward_real, real)
+                # d_error_real.backward()
                 print("D_x:\t\t", d_forward_real.mean().item())
 
-                labels.fill_(fake)
-
                 # Generate some random noise
-                noise_batch = torch.randn(argl.batch_size, argl.noise, 1, 1)
+                noise_batch = torch.randn(argl.batch_size, argl.noise, 1, 1, requires_grad=False)
                 # noise_batch = torch.rand(argl.batch_size, argl.noise, requires_grad=False)
                 # Shape is batch_size x nz x 1 x 1
                 # print("Noise shape: " + str(noise_batch.shape))
@@ -140,6 +134,7 @@ if __name__ == '__main__':
                     fake_image = Gz.detach().numpy()[0].transpose(1, 2, 0)
                     fake_image *= 255
                     fake_image = fake_image.astype(np.uint8)
+                    fake_image = cv2.cvtColor(fake_image, cv2.COLOR_RGB2BGR)
                     # fake_image = cv2.resize(fake_image, (300, 300))
 
                     real_image = images.numpy()[0].transpose(1, 2, 0)
@@ -161,36 +156,28 @@ if __name__ == '__main__':
                 # d_forward_fake = model.D.forward(Gz).view(-1)
                 d_forward_fake = model.D(Gz.detach()).view(-1)
                 # print("D_forward_fake shape: ", str(d_forward_fake.shape))
-                d_error_fake = loss_func(d_forward_fake, labels)
-                d_error_fake.backward()
+                d_error_fake = loss_func(d_forward_fake, fake)
+                # d_error_fake.backward()
                 print("D(G(z)):\t", d_forward_fake.mean().item())
                 # print(noise_batch)
 
-                # total_real = (d_error_real + d_error_fake) / 2
-                # total_real.backward()
+                total_real = (d_error_real + d_error_fake) / 2
+                total_real.backward()
 
                 D_optimizer.step()
                 model.G.zero_grad()
 
-                # Train the Generator
-                labels.fill_(real)
-
                 g_forward_fake = model.D(Gz).view(-1)
-                g_error_real = loss_func(g_forward_fake, labels)
+                g_error_real = loss_func(g_forward_fake, real)
                 g_error_real.backward()
-
-                # labels.fill_(fake)
-
-                # g_forward_real = model.D.forward(images).view(-1)
-                # g_error_fake = loss_func(g_forward_real, labels)
-                # g_error_fake.backward()
-
-                # g_error_total = g_error_real + g_error_fake
 
                 G_optimizer.step()
 
                 print("[%d/%d] %d/%d: D_loss_real [%.4f] D_loss_fake [%.4f] G_loss [%.4f]"
-                      % (e+1, argl.epochs, i+1, len(train_loader), d_error_real, d_error_fake, g_error_real))
+                      % (e+1, argl.epochs, i+1, len(train_loader),
+                         d_error_real.mean().item(),
+                         d_error_fake.mean().item(),
+                         g_error_real.mean().item()))
 
         torch.save({
             "Discriminator": model.D.state_dict(),
@@ -213,6 +200,7 @@ if __name__ == '__main__':
         im = generated.numpy()[0].transpose(1, 2, 0)
         im *= 255
         im = im.astype(np.uint8)
+        im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
 
         win = cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
         cv2.resizeWindow("Image", 300, 300)

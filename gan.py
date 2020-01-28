@@ -42,7 +42,7 @@ class GAN:
         if type(m) in [nn.ConvTranspose2d, nn.Conv2d]:
             nn.init.normal_(m.weight.data, 0.0, 0.02)
         elif type(m) is nn.BatchNorm2d:
-            nn.init.normal_(m.weight.data, 1.0, 0.2)
+            nn.init.normal_(m.weight.data, 1.0, 0.02)
             nn.init.constant_(m.bias.data, 0)
 
     class Generator(nn.Module):
@@ -54,49 +54,30 @@ class GAN:
             bias = False
 
             # act = nn.LeakyReLU(0.2, inplace=True)
-            act = nn.ReLU(True)
+            act = nn.Tanh()
 
             # W - K + 2P
             # ---------- + 1
             #     S
 
-            self.main1 = nn.Sequential(
-                nn.ConvTranspose2d(nz, 32, kernel_size=13, stride=5, padding=0, bias=bias),
-                nn.BatchNorm2d(32),
-                act,
-                nn.ConvTranspose2d(32, 3, kernel_size=4, stride=3, padding=4, bias=bias),
-                nn.Tanh()
-            )
-
             self.main = nn.Sequential(
-                nn.ConvTranspose2d(nz, 512, kernel_size=5, stride=3, padding=0, bias=bias),
-                nn.BatchNorm2d(512),
-                # activation(),
-                act,
-                nn.ConvTranspose2d(512, 256, kernel_size=5, stride=3, padding=1, bias=bias),
+                nn.ConvTranspose2d(nz, 256, kernel_size=3, stride=1, padding=0, bias=bias),
                 nn.BatchNorm2d(256),
                 # activation(),
                 act,
-                nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1, bias=bias),
+                nn.Upsample(scale_factor=2),
+                nn.ConvTranspose2d(256, 128, kernel_size=3, stride=1, padding=0, bias=bias),
                 nn.BatchNorm2d(128),
                 # activation(),
                 act,
-                nn.ConvTranspose2d(128, channels, kernel_size=3, stride=1, padding=0, bias=bias),
+                nn.Upsample(scale_factor=2),
+                nn.ConvTranspose2d(128, 64, kernel_size=3, stride=1, padding=1, bias=bias),
+                nn.BatchNorm2d(64),
+                # activation(),
+                act,
+                nn.Upsample(scale_factor=2),
+                nn.ConvTranspose2d(64, channels, kernel_size=3, stride=1, padding=1, bias=bias),
                 nn.Tanh(),
-            )
-
-            self.main2 = nn.Sequential(
-                nn.Linear(nz, 3*64**2, bias=bias),
-                nn.BatchNorm1d(3*64**2),
-                act,
-                nn.Linear(3*64**2, 3*48**2, bias=bias),
-                nn.BatchNorm1d(3*48**2),
-                act,
-                nn.Linear(3*48**2, 3*36**2, bias=bias),
-                nn.BatchNorm1d(3*36**2),
-                act,
-                nn.Linear(3*36**2, 3*32**2, bias=bias),
-                nn.Sigmoid(),
             )
 
         def forward(self, z):
@@ -115,10 +96,10 @@ class GAN:
 
             self.main = nn.Sequential(
                 nn.Conv2d(channels, 4, kernel_size=5, padding=0, stride=2, bias=bias),
-                nn.BatchNorm2d(4),
+                # nn.BatchNorm2d(4),
                 act,
                 nn.Conv2d(4, 8, kernel_size=5, padding=0, stride=2, bias=bias),
-                nn.BatchNorm2d(8),
+                # nn.BatchNorm2d(8),
                 act,
                 # nn.Conv2d(64, 128, kernel_size=5, padding=1, stride=2, bias=bias),
                 # nn.BatchNorm2d(128),
